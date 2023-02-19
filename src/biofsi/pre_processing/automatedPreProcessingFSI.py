@@ -16,6 +16,9 @@ from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get
     compute_flow_rate, setup_model_network, radiusArrayName
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
+
+from pre_processing_common import generate_mesh_fsi
+
 def str2bool(boolean):
     """Convert a string to boolean.
     Args:
@@ -35,6 +38,26 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
                        refine_region, create_flow_extensions, viz, coarsening_factor,
                        inlet_flow_extension_length, outlet_flow_extension_length, edge_length, region_points,
                        compress_mesh):
+    """
+    Run the pre-processing steps for the FSI model.
+    Args:
+        filename_model (str): Path to the model file.
+        verbose_print (bool): Print additional information.
+        smoothing_method (str): Smoothing method to use.
+        smoothing_factor (float): Smoothing factor.
+        meshing_method (str): Meshing method to use.
+        refine_region (bool): Refine the region around the centerline.
+        create_flow_extensions (bool): Create flow extensions.
+        viz (bool): Visualize the model.
+        coarsening_factor (float): Coarsening factor.
+        inlet_flow_extension_length (float): Length of the inlet flow extension.
+        outlet_flow_extension_length (float): Length of the outlet flow extension.
+        edge_length (float): Edge length.
+        region_points (int): Position of the refinement region.
+        compress_mesh (bool): Compress the mesh.
+    Returns:
+        None (volumential mesh is written to the same folder as the input model)
+    """
     # Get paths
     abs_path = path.abspath(path.dirname(__file__))
     case_name = filename_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
@@ -61,7 +84,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
 
     print("\n--- Working on case:", case_name, "\n")
 
-      # Open the surface file.
+    # Open the surface file.
     print("--- Load model file\n")
     surface = read_polydata(filename_model)
 
@@ -187,7 +210,8 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
 
             # Check if there has been added new outlets
             num_outlets = centerlines.GetNumberOfLines()
-            num_outlets_after = compute_centers_for_meshing(surface_uncapped, None, test_capped=True)[1]
+            inlets, outlets = compute_centers(surface_uncapped)
+            num_outlets_after = len(outlets) // 3
 
             if num_outlets != num_outlets_after:
                 surface = vmtk_smooth_surface(surface, "laplace", iterations=200)
@@ -320,7 +344,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     if viz:
         print("--- Visualizing flow split at outlets, inlet flow rate, and probes in VTK render window. ")
         print("--- Press 'q' inside the render window to exit.")
-        visualize(network.elements, probe_points, surface_extended, mean_inflow_rate)
+        filename_model(network.elements, probe_points, surface_extended, mean_inflow_rate)
 
     print("--- Removing unused pre-processing files")
     files_to_remove = [file_name_centerlines, file_name_refine_region_centerlines, file_name_region_centerlines,
