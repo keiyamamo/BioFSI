@@ -287,23 +287,24 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
         else:
             centerlines = read_polydata(file_name_flow_centerlines)
 
-    # Choose input for the mesh
-    print("\n--- Remeshing the surface based on a given seed point\n")
-    
-    remeshed_surface_seed = refine_mesh_seed(surface_extended, region_points, file_name_seedX)
+    if not path.isfile(file_name_seedX):
+        print("\n--- Remeshing the surface based on a given seed point\n")
+        remeshed_surface_seed = refine_mesh_seed(surface_extended, region_points, coarsening_factor, file_name_seedX)
+    else:
+        remeshed_surface_seed = read_polydata(file_name_seedX)
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         try:
             print("--- Computing mesh\n")
-            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.34)
+            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.23)
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh"
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh"
 
         except:
             remeshed_surface_seed = mesh_alternative(remeshed_surface_seed)
-            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.34)
+            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.23)
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, after remeshing"
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh" 
