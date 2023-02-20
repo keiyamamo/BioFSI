@@ -12,12 +12,12 @@ from morphman import is_surface_capped, get_uncapped_surface, write_polydata, ge
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
-    write_mesh, mesh_alternative, generate_mesh, find_boundaries, \
+    mesh_alternative, find_boundaries, \
     compute_flow_rate, setup_model_network, radiusArrayName
 from vampy.automatedPreprocessing.simulate import run_simulation
 from vampy.automatedPreprocessing.visualize import visualize_model
 
-from pre_processing_common import generate_mesh_fsi
+from pre_processing_common import scale_surface, scale_mesh, refine_mesh_seed, generate_mesh_fsi, write_mesh
 
 def str2bool(boolean):
     """Convert a string to boolean.
@@ -37,7 +37,7 @@ def str2bool(boolean):
 def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothing_factor, meshing_method,
                        refine_region, create_flow_extensions, viz, coarsening_factor,
                        inlet_flow_extension_length, outlet_flow_extension_length, edge_length, region_points,
-                       compress_mesh):
+                       compress_mesh, scale_factor):
     """
     Run the pre-processing steps for the FSI model.
     Args:
@@ -81,6 +81,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     file_name_xml_mesh = path.join(dir_path, case_name + "_fsi.xml")
     file_name_vtu_mesh = path.join(dir_path, case_name + "_fsi.vtu")
     file_name_run_script = path.join(dir_path, case_name + ".sh")
+    file_name_seedX = path.join(dir_path, case_name + "_seedX.vtp")
 
     print("\n--- Working on case:", case_name, "\n")
 
@@ -131,10 +132,10 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     centerlines, _, _ = compute_centerlines(source, target, file_name_centerlines, capped_surface, resampling=0.1)
     tol = get_centerline_tolerance(centerlines)
 
-     # Get 'center' and 'radius' of the regions(s)
+    # Get 'center' and 'radius' of the regions(s)
     region_center = []
     misr_max = []
-
+    
     if refine_region:
         regions = get_regions_to_refine(capped_surface, region_points, path.join(dir_path, case_name))
         for i in range(len(regions) // 3):
@@ -186,7 +187,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
         if not path.isfile(file_name_surface_smooth):
             # Get Voronoi diagram
             if not path.isfile(file_name_voronoi):
-                voronoi = make_voronoi_diagram(surface, file_name_voronoi)
+                voronoi = vmtk_compute_voronoi_diagram(surface, file_name_voronoi)
                 write_polydata(voronoi, file_name_voronoi)
             else:
                 voronoi = read_polydata(file_name_voronoi)
@@ -287,42 +288,29 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
             centerlines = read_polydata(file_name_flow_centerlines)
 
     # Choose input for the mesh
-    print("--- Computing distance to sphere\n")
-    if meshing_method == "constant":
-        if not path.isfile(file_name_distance_to_sphere_const):
-            distance_to_sphere = dist_sphere_constant(surface_extended, centerlines, region_center, misr_max,
-                                                      file_name_distance_to_sphere_const, edge_length)
-        else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_const)
-
-    elif meshing_method == "curvature":
-        if not path.isfile(file_name_distance_to_sphere_curv):
-            distance_to_sphere = dist_sphere_curvature(surface_extended, centerlines, region_center, misr_max,
-                                                       file_name_distance_to_sphere_curv, coarsening_factor)
-        else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_curv)
-    elif meshing_method == "diameter":
-        if not path.isfile(file_name_distance_to_sphere_diam):
-            distance_to_sphere = dist_sphere_diam(surface_extended, centerlines, region_center, misr_max,
-                                                  file_name_distance_to_sphere_diam, coarsening_factor)
-        else:
-            distance_to_sphere = read_polydata(file_name_distance_to_sphere_diam)
+    print("\n--- Remeshing the surface based on a given seed point\n")
+    
+    remeshed_surface_seed = refine_mesh_seed(surface_extended, region_points, file_name_seedX)
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         try:
             print("--- Computing mesh\n")
-            mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere)
+            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.34)
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh"
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh"
 
         except:
-            distance_to_sphere = mesh_alternative(distance_to_sphere)
-            mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere)
+            remeshed_surface_seed = mesh_alternative(remeshed_surface_seed)
+            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.34)
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, after remeshing"
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh" 
+        
+        if scale_factor is not None:
+            remeshed_surface = scale_surface(remeshed_surface, scale_factor)
+            mesh = scale_mesh(mesh, scale_factor)
 
         write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_name_xml_mesh,
                    mesh, remeshed_surface)
@@ -344,7 +332,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     if viz:
         print("--- Visualizing flow split at outlets, inlet flow rate, and probes in VTK render window. ")
         print("--- Press 'q' inside the render window to exit.")
-        filename_model(network.elements, probe_points, surface_extended, mean_inflow_rate)
+        visualize_model(network.elements, probe_points, surface_extended, mean_inflow_rate)
 
     print("--- Removing unused pre-processing files")
     files_to_remove = [file_name_centerlines, file_name_refine_region_centerlines, file_name_region_centerlines,
@@ -461,7 +449,11 @@ def read_command_line():
                         type=str2bool,
                         help="Visualize surface, inlet, outlet and probes after meshing.")
 
-    # parser.add_argument('-st', '--solidthickness',
+    parser.add_argument('-sc', '--scale-factor',
+                    default=0.001,
+                    type=float,
+                    help="Scale input model by this factor.")
+
 
 
     args, _ = parser.parse_known_args()
@@ -484,7 +476,7 @@ def read_command_line():
                 refine_region=args.refineRegion, create_flow_extensions=args.flowExtension, viz=args.viz,
                 coarsening_factor=args.coarseningFactor, inlet_flow_extension_length=args.inletFlowExtLen,
                 edge_length=args.edgeLength, region_points=args.regionPoints, compress_mesh=args.compressMesh,
-                outlet_flow_extension_length=args.outletFlowExtLen)
+                outlet_flow_extension_length=args.outletFlowExtLen, scale_factor=args.scale_factor)
 
 if __name__ == "__main__":
-    run_pre_processing(**read_command_line()) 
+    run_pre_processing(**read_command_line())
