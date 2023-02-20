@@ -42,7 +42,7 @@ def scale_mesh(mesh, scale_factor):
 
     return scaled_mesh
 
-def refine_mesh_seed(surface, seedX, seedXFile):
+def refine_mesh_seed(surface, seedX, coarsening_factor, seedXFile):
     """
     Refine mesh based on a seed point.
     Args:
@@ -53,9 +53,9 @@ def refine_mesh_seed(surface, seedX, seedXFile):
         surface (vtkPolyData): Surface model
     """
     # Parameters
-    TargetEdgeLength_s = 0.38
-    factor_scale = 2.2  # multiplier for max element size
-    factor_shape = 0.1  # 1==linear scale based on distance
+    TargetEdgeLength_s = 0.25
+    factor_scale = coarsening_factor  # multiplier for max element size
+    factor_shape = 0.3  # 1==linear scale based on distance
 
     N = surface.GetNumberOfPoints()
     dist_array = np.zeros(N)
