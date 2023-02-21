@@ -6,15 +6,14 @@ import numpy as np
 from morphman import is_surface_capped, get_uncapped_surface, write_polydata, get_parameters, vtk_clean_polydata, \
     vtk_triangulate_surface, write_parameters, vmtk_cap_polydata, compute_centerlines, get_centerline_tolerance, \
     get_vtk_point_locator, extract_single_line, vtk_merge_polydata, get_point_data_array, smooth_voronoi_diagram, \
-    create_new_surface, compute_centers, vmtk_smooth_surface, str2bool, vmtk_compute_voronoi_diagram, \
-    prepare_output_surface
+    create_new_surface, compute_centers, vmtk_smooth_surface, str2bool, vmtk_compute_voronoi_diagram
 
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
-    dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
+    get_regions_to_refine, add_flow_extension, \
     mesh_alternative, find_boundaries, \
     compute_flow_rate, setup_model_network, radiusArrayName
-from vampy.automatedPreprocessing.simulate import run_simulation
+
 from vampy.automatedPreprocessing.visualize import visualize_model
 
 from pre_processing_common import scale_surface, scale_mesh, refine_mesh_seed, generate_mesh_fsi, write_mesh
