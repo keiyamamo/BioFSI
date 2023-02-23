@@ -42,59 +42,6 @@ def scale_mesh(mesh, scale_factor):
 
     return scaled_mesh
 
-def refine_mesh_seed(surface, seedX, coarsening_factor, seedXFile):
-    """
-    Refine mesh based on a seed point.
-    Args:
-        surface (vtkPolyData): Surface model to be meshed.
-        seedX (list): Coordinates of the seed point.
-        seedXFile (str): Path to the output file.
-    Returns:
-        surface (vtkPolyData): Surface model
-    """
-    # Parameters
-    TargetEdgeLength_s = 0.25
-    factor_scale = coarsening_factor  # multiplier for max element size
-    factor_shape = 0.3  # 1==linear scale based on distance
-
-    N = surface.GetNumberOfPoints()
-    dist_array = np.zeros(N)
-    # Compute distance
-    for i in range(N):
-        piX = surface.GetPoints().GetPoint(i)
-        dist_array[i] = np.sqrt(np.sum((np.asarray(seedX) - np.asarray(piX))**2))
-    dist_array[:] = dist_array[:] - dist_array.min()  # between 0 and max
-    dist_array[:] = dist_array[:] / dist_array.max() + 1  # between 1 and 2
-    dist_array[:] = dist_array[:]**factor_shape - 1  # between 0 and 2^factor_shape
-    dist_array[:] = dist_array[:] / dist_array.max()  # between 0 and 1
-    dist_array[:] = dist_array[:]*(factor_scale-1) + 1  # between 1 and factor_scale
-    dist_array[:] = dist_array[:] * TargetEdgeLength_s  # Scaled TargetEdgeLength
-    array = vtk.vtkDoubleArray()
-    array.SetNumberOfComponents(1)
-    array.SetNumberOfTuples(N)
-    array.SetName("Size")
-    for i in range(N):
-        array.SetTuple1(i, dist_array[i])
-    surface.GetPointData().AddArray(array)
-
-    remeshing = vmtkscripts.vmtkSurfaceRemeshing()
-    remeshing.Surface = surface
-    remeshing.TargetEdgeLength = TargetEdgeLength_s
-    remeshing.MaxEdgeLength = factor_scale*remeshing.TargetEdgeLength
-    remeshing.MinEdgeLength = 0.5*remeshing.TargetEdgeLength
-    remeshing.TargetEdgeLengthArrayName = "Size"
-    remeshing.ElementSizeMode = "edgelengtharray"
-    remeshing.Execute()
-    surface = remeshing.Surface
-
-    writer = vtk.vtkXMLPolyDataWriter()
-    writer.SetFileName(seedXFile)
-    writer.SetInputData(surface)
-    writer.Update()
-    writer.Write()
-    
-    return surface
-
 def generate_mesh_fsi(surface, Solid_thickness, TargetEdgeLength):
     """
     Generates a mesh suitable for FSI from a input surface model.

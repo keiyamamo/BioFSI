@@ -10,13 +10,13 @@ from morphman import is_surface_capped, get_uncapped_surface, write_polydata, ge
 
 from vampy.automatedPreprocessing import ToolRepairSTL
 from vampy.automatedPreprocessing.preprocessing_common import read_polydata, get_centers_for_meshing, \
-    get_regions_to_refine, add_flow_extension, \
+     dist_sphere_diam, dist_sphere_curvature, dist_sphere_constant, get_regions_to_refine, add_flow_extension, \
     mesh_alternative, find_boundaries, \
     compute_flow_rate, setup_model_network, radiusArrayName
 
 from vampy.automatedPreprocessing.visualize import visualize_model
 
-from pre_processing_common import scale_surface, scale_mesh, refine_mesh_seed, generate_mesh_fsi, write_mesh
+from pre_processing_common import scale_surface, scale_mesh, generate_mesh_fsi, write_mesh
 
 def str2bool(boolean):
     """Convert a string to boolean.
@@ -286,24 +286,40 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
         else:
             centerlines = read_polydata(file_name_flow_centerlines)
 
-    if not path.isfile(file_name_seedX):
-        print("\n--- Remeshing the surface based on a given seed point\n")
-        remeshed_surface_seed = refine_mesh_seed(surface_extended, region_points, coarsening_factor, file_name_seedX)
-    else:
-        remeshed_surface_seed = read_polydata(file_name_seedX)
+      # Choose input for the mesh
+    print("--- Computing distance to sphere\n")
+    if meshing_method == "constant":
+        if not path.isfile(file_name_distance_to_sphere_const):
+            distance_to_sphere = dist_sphere_constant(surface_extended, centerlines, region_center, misr_max,
+                                                      file_name_distance_to_sphere_const, edge_length)
+        else:
+            distance_to_sphere = read_polydata(file_name_distance_to_sphere_const)
+
+    elif meshing_method == "curvature":
+        if not path.isfile(file_name_distance_to_sphere_curv):
+            distance_to_sphere = dist_sphere_curvature(surface_extended, centerlines, region_center, misr_max,
+                                                       file_name_distance_to_sphere_curv, coarsening_factor)
+        else:
+            distance_to_sphere = read_polydata(file_name_distance_to_sphere_curv)
+    elif meshing_method == "diameter":
+        if not path.isfile(file_name_distance_to_sphere_diam):
+            distance_to_sphere = dist_sphere_diam(surface_extended, centerlines, region_center, misr_max,
+                                                  file_name_distance_to_sphere_diam, coarsening_factor)
+        else:
+            distance_to_sphere = read_polydata(file_name_distance_to_sphere_diam)
 
     # Compute mesh
     if not path.isfile(file_name_vtu_mesh):
         try:
             print("--- Computing mesh\n")
-            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.23)
+            mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere, Solid_thickness=0.25, TargetEdgeLength=0.30)
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh"
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh"
 
         except:
-            remeshed_surface_seed = mesh_alternative(remeshed_surface_seed)
-            mesh, remeshed_surface = generate_mesh_fsi(remeshed_surface_seed, Solid_thickness=0.25, TargetEdgeLength=0.23)
+            distance_to_sphere = mesh_alternative(distance_to_sphere)
+            mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere, Solid_thickness=0.25, TargetEdgeLength=0.30)
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, after remeshing"
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh" 
