@@ -42,7 +42,7 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     Args:
         filename_model (str): Path to the model file.
         verbose_print (bool): Print additional information.
-        smoothing_method (str): Smoothing method to use.
+        smoothing_method (str): Smoothing method to use. NOTE: Laplace smoothing could reduce the area of the model and could be dangerous.
         smoothing_factor (float): Smoothing factor.
         meshing_method (str): Meshing method to use.
         refine_region (bool): Refine the region around the centerline.
