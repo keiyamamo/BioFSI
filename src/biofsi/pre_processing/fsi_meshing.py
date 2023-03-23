@@ -80,7 +80,6 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     file_name_xml_mesh = path.join(dir_path, case_name + "_fsi.xml")
     file_name_vtu_mesh = path.join(dir_path, case_name + "_fsi.vtu")
     file_name_run_script = path.join(dir_path, case_name + ".sh")
-    file_name_seedX = path.join(dir_path, case_name + "_seedX.vtp")
 
     print("\n--- Working on case:", case_name, "\n")
 
@@ -312,12 +311,14 @@ def run_pre_processing(filename_model, verbose_print, smoothing_method, smoothin
     if not path.isfile(file_name_vtu_mesh):
         try:
             print("--- Computing mesh\n")
+            # TODO: TargetEdgeLength should not be hard coded
             mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere, Solid_thickness=0.25, TargetEdgeLength=0.30)
             assert remeshed_surface.GetNumberOfPoints() > 0, \
                 "No points in surface mesh, try to remesh"
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, try to remesh"
 
         except:
+            # TODO: TargetEdgeLength should not be hard coded
             distance_to_sphere = mesh_alternative(distance_to_sphere)
             mesh, remeshed_surface = generate_mesh_fsi(distance_to_sphere, Solid_thickness=0.25, TargetEdgeLength=0.30)
             assert mesh.GetNumberOfPoints() > 0, "No points in mesh, after remeshing"
@@ -391,7 +392,7 @@ def read_command_line():
                         type=str,
                         required=False,
                         dest='smoothingMethod',
-                        default="laplace",
+                        default="taubin",
                         choices=["voronoi", "no_smooth", "laplace", "taubin"],
                         help="Smoothing method, for now only Voronoi smoothing is available." +
                              " For Voronoi smoothing you can also control smoothingFactor" +
@@ -420,7 +421,7 @@ def read_command_line():
 
     parser.add_argument('-el', '--edge-length',
                         dest="edgeLength",
-                        default=None,
+                        default=0.5,
                         type=float,
                         help="Characteristic edge length used for meshing.")
 
