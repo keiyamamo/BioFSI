@@ -130,3 +130,11 @@ dmypy.json
 
 # OS specific files
 .DS_Store
+
+# mesh files
+*.vtp
+*.vtu
+*.xml
+
+*.json
+*_probe_point
