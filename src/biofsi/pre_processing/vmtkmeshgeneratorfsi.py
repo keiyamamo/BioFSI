@@ -24,7 +24,7 @@ from __future__ import absolute_import  # NEEDS TO STAY AS TOP LEVEL MODULE FOR 
 import vtk
 from vmtk import vtkvmtk, vmtkscripts, pypes
 import sys
-
+import numpy as np
 
 class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
@@ -36,11 +36,15 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
 
         self.TargetEdgeLength = 1.0
         self.TargetEdgeLengthFactor = 1.0
+        # FIXME : should be ArrayNameFluid and ArrayNameSolid?
         self.TargetEdgeLengthArrayName = ''
+        self.TargetEdgeLengthArrayNameSolid = ''
         self.MaxEdgeLength = 1E16
         self.MinEdgeLength = 0.0
         self.TriangleSplitFactor = 5.0
         self.CellEntityIdsArrayName = 'CellEntityIds'
+        self.ElementSizeModeFluid = 'edgelength'
+        self.ElementSizeModeSolid = 'edgelength'
         self.ElementSizeMode = 'edgelength'
         self.VolumeElementScaleFactor = 0.8
         self.CappingMethod = 'simple'
@@ -50,9 +54,12 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.EndcapsEdgeLengthFactor = 1.0
 
         self.BoundaryLayer = 0
-        self.NumberOfSubLayers = 2
-        self.SubLayerRatio = 0.5
-        self.BoundaryLayerThicknessFactor = 0.25
+        self.NumberOfSubLayersFluid = 2
+        self.NumberOfSubLayersSolid = 2
+        self.SubLayerRatioFluid = 0.5
+        self.SubLayerRatioSolid = 0.5
+        self.BoundaryLayerThicknessFactorFluid = 0.25
+        self.BoundaryLayerThicknessFactorSolid = 0.25
 
         self.NumberOfSubsteps = 2000
         self.Relaxation = 0.01
@@ -74,11 +81,12 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
         self.RemeshedSurface = None
 
         self.SetScriptName('vmtkmeshgenerator')
-        self.SetScriptDoc('generate a mesh suitable for CFD from a surface')
+        self.SetScriptDoc('generate a mesh suitable for  from a surface')
         self.SetInputMembers([
             ['Surface', 'i', 'vtkPolyData', 1, '', 'the input surface', 'vmtksurfacereader'],
             ['TargetEdgeLength', 'edgelength', 'float', 1, '(0.0,)'],
             ['TargetEdgeLengthArrayName', 'edgelengtharray', 'str', 1],
+            ['TargetEdgeLengthArrayNameSolid', 'edgelengtharraysolid', 'str', 1],
             ['TargetEdgeLengthFactor', 'edgelengthfactor', 'float', 1, '(0.0,)'],
             ['TriangleSplitFactor', 'trianglesplitfactor', 'float', 1, '(0.0,)'],
             ['EndcapsEdgeLengthFactor', 'endcapsedgelengthfactor', 'float', 1, '(0.0,)'],
@@ -86,20 +94,33 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             ['MinEdgeLength', 'minedgelength', 'float', 1, '(0.0,)'],
             ['CellEntityIdsArrayName', 'entityidsarray', 'str', 1],
             ['ElementSizeMode', 'elementsizemode', 'str', 1, '["edgelength","edgelengtharray"]'],
+            ['ElementSizeModeFluid', 'elementsizemodefluid', 'str', 1, '["edgelength","edgelengtharray"]'],
+            ['ElementSizeModeSolid', 'elementsizemodesolid', 'str', 1, '["edgelength","edgelengtharray"]'],
             ['CappingMethod', 'cappingmethod', 'str', 1, '["simple","annular","concaveannular"]'],
             ['SkipCapping', 'skipcapping', 'bool', 1, ''],
             ['SkipRemeshing', 'skipremeshing', 'bool', 1, ''],
             ['VolumeElementScaleFactor', 'volumeelementfactor', 'float', 1, '(0.0,)'],
             ['BoundaryLayer', 'boundarylayer', 'bool', 1, ''],
-            ['NumberOfSubLayers', 'sublayers', 'int', 1, '(0,)'],
-            ['NumberOfSubsteps', 'substeps', 'int', 1, '(0,)'],
-            ['Relaxation', 'relaxation', 'float', 1, '(0.0,)'],
+            ['NumberOfSubLayersFluid', 'sublayersfluid', 'int', 1, '(0,)'],
+            ['NumberOfSubLayersSolid', 'sublayerssolid', 'int', 1, '(0,)'],
+            ['NumberOfSubsteps', 'substeps', 'int', 1, '(0,)'], #FIXME: Is this variable necessary?
+            ['NumberOfSubstepsSolid', 'substepssolid', 'int', 1, '(0,)'],
+            ['NumberOfSubstepsFluid', 'substepsfluid', 'int', 1, '(0,)'],
+            ['Relaxation', 'relaxation', 'float', 1, '(0.0,)'], #FIXME: Is this variable necessary?
+            ['RelaxationSolid', 'relaxationsolid', 'float', 1, '(0.0,)'],
+            ['RelaxationFluid', 'relaxationfluid', 'float', 1, '(0.0,)'],
             ['LocalCorrectionFactor', 'localcorrection', 'float', 1, '(0.0,)'],
-            ['SubLayerRatio', 'sublayerratio', 'float', 1, '(0.0,)'],
+            ['LocalCorrectionFactorFluid', 'localcorrectionfluid', 'float', 1, '(0.0,)'],
+            ['LocalCorrectionFactorSolid', 'localcorrectionsolid', 'float', 1, '(0.0,)'],
+            ['SubLayerRatioFluid', 'sublayerratiofluid', 'float', 1, '(0.0,)'],
+            ['SubLayerRatioSolid', 'sublayerratiosolid', 'float', 1, '(0.0,)'],
             ['BoundaryLayerThicknessFactor', 'thicknessfactor', 'float', 1, '(0.0,)'],
+            ['BoundaryLayerThicknessFactorFluid', 'thicknessfactorfluid', 'float', 1, '(0.0,)'],
+            ['BoundaryLayerThicknessFactorSolid', 'thicknessfactorsolid', 'float', 1, '(0.0,)'],
             ['RemeshCapsOnly', 'remeshcapsonly', 'bool', 1, ''],
             ['BoundaryLayerOnCaps', 'boundarylayeroncaps', 'bool', 1, ''],
-            ['Tetrahedralize', 'tetrahedralize', 'bool', 1, '']
+            ['Tetrahedralize', 'tetrahedralize', 'bool', 1, ''],
+            
         ])
         self.SetOutputMembers([
             ['Mesh', 'o', 'vtkUnstructuredGrid', 1, '', 'the output mesh', 'vmtkmeshwriter'],
@@ -181,14 +202,14 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             else:
                 boundaryLayer.ConstantThickness = False
             boundaryLayer.IncludeSurfaceCells = 0
-            boundaryLayer.NumberOfSubLayers = self.NumberOfSubLayers
+            boundaryLayer.NumberOfSubLayers = self.NumberOfSubLayersFluid
             boundaryLayer.NumberOfSubsteps = self.NumberOfSubsteps
             boundaryLayer.Relaxation = self.Relaxation
             boundaryLayer.LocalCorrectionFactor = self.LocalCorrectionFactor
-            boundaryLayer.SubLayerRatio = self.SubLayerRatio
-            boundaryLayer.Thickness = self.BoundaryLayerThicknessFactor * self.TargetEdgeLength
-            boundaryLayer.ThicknessRatio = self.BoundaryLayerThicknessFactor * self.TargetEdgeLengthFactor
-            boundaryLayer.MaximumThickness = self.BoundaryLayerThicknessFactor * self.MaxEdgeLength
+            boundaryLayer.SubLayerRatio = self.SubLayerRatioFluid
+            boundaryLayer.Thickness = self.BoundaryLayerThicknessFactorFluid * self.TargetEdgeLength
+            boundaryLayer.ThicknessRatio = self.BoundaryLayerThicknessFactorFluid * self.TargetEdgeLengthFactor
+            boundaryLayer.MaximumThickness = self.BoundaryLayerThicknessFactorFluid * self.MaxEdgeLength
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer.SidewallCellEntityId = placeholderCellEntityId
                 boundaryLayer.InnerSurfaceCellEntityId = wallEntityOffset
@@ -200,20 +221,20 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             boundaryLayer2.Mesh = surfaceToMesh.Mesh
             boundaryLayer2.WarpVectorsArrayName = 'Normals'
             boundaryLayer2.NegateWarpVectors = True
-            boundaryLayer2.ThicknessArrayName = self.TargetEdgeLengthArrayName
-            if self.ElementSizeMode == 'edgelength':
+            boundaryLayer2.ThicknessArrayName = self.TargetEdgeLengthArrayNameSolid
+            if self.ElementSizeModeSolid == 'edgelength':
                 boundaryLayer2.ConstantThickness = True
             else:
                 boundaryLayer2.ConstantThickness = False
             boundaryLayer2.IncludeSurfaceCells = 1
-            boundaryLayer2.NumberOfSubLayers = self.NumberOfSubLayers
+            boundaryLayer2.NumberOfSubLayers = self.NumberOfSubLayersSolid
             boundaryLayer2.NumberOfSubsteps = self.NumberOfSubsteps
             boundaryLayer2.Relaxation = self.Relaxation
             boundaryLayer2.LocalCorrectionFactor = self.LocalCorrectionFactor
-            boundaryLayer2.SubLayerRatio = self.SubLayerRatio
-            boundaryLayer2.Thickness = self.BoundaryLayerThicknessFactor * self.TargetEdgeLength
-            boundaryLayer2.ThicknessRatio = self.BoundaryLayerThicknessFactor * self.TargetEdgeLengthFactor
-            boundaryLayer2.MaximumThickness = self.BoundaryLayerThicknessFactor * self.MaxEdgeLength
+            boundaryLayer2.SubLayerRatio = self.SubLayerRatioSolid
+            boundaryLayer2.Thickness = self.BoundaryLayerThicknessFactorSolid * self.TargetEdgeLength
+            boundaryLayer2.ThicknessRatio = self.BoundaryLayerThicknessFactorSolid * self.TargetEdgeLengthFactor
+            boundaryLayer2.MaximumThickness = self.BoundaryLayerThicknessFactorSolid * self.MaxEdgeLength
             if not self.BoundaryLayerOnCaps:
                 boundaryLayer2.SidewallCellEntityId = self.SolidSideWallId  # placeholderCellEntityId
                 boundaryLayer2.InnerSurfaceCellEntityId = self.InterfaceId_fsi  # wallEntityOffset
@@ -280,6 +301,9 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.OutputSurfaceElements = 1
             tetgen.OutputVolumeElements = 1
             tetgen.RegionAttrib = 0
+            tetgen.DoCheck = 1
+            tetgen.MinRatio = 0.1
+
             tetgen.Execute()
 
             # ADDING CELL IDs

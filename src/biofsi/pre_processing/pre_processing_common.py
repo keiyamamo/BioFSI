@@ -52,21 +52,30 @@ def generate_mesh_fsi(surface, Solid_thickness, TargetEdgeLength):
         remeshedsurface (vtkPolyData): Remeshed version of the input model
     """
 
-    # Parameters
+    # Parameters for meshing
     meshGenerator = vmtkMeshGeneratorFsi()
     meshGenerator.Surface = surface
+    meshGenerator.SkipRemeshing = 0
     meshGenerator.ElementSizeMode = 'edgelength'
+    meshGenerator.ElementSizeModeSolid = "edgelengtharray"
     meshGenerator.TargetEdgeLength = TargetEdgeLength
+    # meshGenerator.TargetEdgeLengthArrayNameSolid = "Thickness"
+    meshGenerator.Tetrahedralize = 1
     meshGenerator.MaxEdgeLength = 15*meshGenerator.TargetEdgeLength
     meshGenerator.MinEdgeLength = 5*meshGenerator.TargetEdgeLength
+    # Parameters for boundary layer
     meshGenerator.BoundaryLayer = 1
-    meshGenerator.NumberOfSubLayers = 2
+    meshGenerator.NumberOfSubLayersFluid = 2
+    meshGenerator.NumberOfSubLayersSolid = 2
     meshGenerator.BoundaryLayerOnCaps = 0
-    meshGenerator.BoundaryLayerThicknessFactor = Solid_thickness / TargetEdgeLength 
-    meshGenerator.SubLayerRatio = 1
-    meshGenerator.Tetrahedralize = 1
-    meshGenerator.VolumeElementScaleFactor = 0.8
-    meshGenerator.EndcapsEdgeLengthFactor = 1.0
+    meshGenerator.SubLayerRatioSolid = 0.75
+    meshGenerator.SubLayerRatioFluid = 0.75
+    # meshGenerator.BoundaryLayerThicknessFactor = Solid_thickness / TargetEdgeLength 
+    meshGenerator.BoundaryLayerThicknessFactorFluid = Solid_thickness / TargetEdgeLength 
+    meshGenerator.BoundaryLayerThicknessFactorSolid = Solid_thickness / TargetEdgeLength 
+
+    # meshGenerator.VolumeElementScaleFactor = 0.8
+    # meshGenerator.EndcapsEdgeLengthFactor = 1.0
 
     # Cells and walls numbering
     meshGenerator.SolidSideWallId = 11
@@ -110,3 +119,4 @@ def write_mesh(compress_mesh, file_name_surface_name, file_name_vtu_mesh, file_n
     meshWriter.WriteRegionMarkers = 1
     meshWriter.OutputFileName = file_name_xml_mesh
     meshWriter.Execute()
+
