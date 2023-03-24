@@ -1,6 +1,7 @@
 import argparse
 import sys
 from os import remove, path
+import time
 
 import numpy as np
 from morphman import is_surface_capped, get_uncapped_surface, write_polydata, get_parameters, vtk_clean_polydata, \
@@ -496,4 +497,32 @@ def read_command_line():
                 outlet_flow_extension_length=args.outletFlowExtLen, scale_factor=args.scale_factor)
 
 if __name__ == "__main__":
-    run_pre_processing(**read_command_line())
+    
+    max_retries = 5
+    retry_delay = 5  # Time delay in seconds between retries
+    a = read_command_line()
+    filename_model = a['filename_model']
+    case_name = filename_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
+    dir_path = filename_model.rsplit(path.sep, 1)[0]
+    file_name_vtu_mesh = path.join(dir_path, case_name + "_fsi.vtu")
+    file_name_xml_mesh = path.join(dir_path, case_name + "_fsi.xml")
+
+    for i in range(max_retries):
+        try:
+            run_pre_processing(**read_command_line())
+            break  # Break out of the loop if the execution is successful
+        except Exception as e:
+            print(f"Error encountered during execution: {e}")
+            if i < max_retries - 1:
+                print(f"Retrying ({i + 1}/{max_retries}) after {retry_delay} seconds...")
+                files_to_remove = [file_name_vtu_mesh, file_name_xml_mesh]
+                for file in files_to_remove:
+                    if path.exists(file):
+                        remove(file)
+                        
+
+                time.sleep(retry_delay)
+            else:
+                print("Max retries reached. Exiting...")
+                raise  # Reraise the exception to exit the script
+    
