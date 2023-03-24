@@ -1,6 +1,6 @@
 import argparse
 import sys
-from os import remove, path
+from os import remove, path, listdir
 import time
 
 import numpy as np
@@ -504,9 +504,7 @@ if __name__ == "__main__":
     filename_model = a['filename_model']
     case_name = filename_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
     dir_path = filename_model.rsplit(path.sep, 1)[0]
-    file_name_vtu_mesh = path.join(dir_path, case_name + "_fsi.vtu")
-    file_name_xml_mesh = path.join(dir_path, case_name + "_fsi.xml")
-
+    file_to_keep = f"{case_name}.vtp"
     for i in range(max_retries):
         try:
             run_pre_processing(**read_command_line())
@@ -515,11 +513,10 @@ if __name__ == "__main__":
             print(f"Error encountered during execution: {e}")
             if i < max_retries - 1:
                 print(f"Retrying ({i + 1}/{max_retries}) after {retry_delay} seconds...")
-                files_to_remove = [file_name_vtu_mesh, file_name_xml_mesh]
-                for file in files_to_remove:
-                    if path.exists(file):
-                        remove(file)
-                        
+                for filename in listdir(dir_path):
+                    file_path = path.join(dir_path, filename)
+                    if path.isfile(file_path) and filename != file_to_keep:
+                        remove(file_path)
 
                 time.sleep(retry_delay)
             else:
