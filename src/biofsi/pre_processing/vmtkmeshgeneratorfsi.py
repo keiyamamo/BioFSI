@@ -280,6 +280,17 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             tetgen.OutputSurfaceElements = 1
             tetgen.OutputVolumeElements = 1
             tetgen.RegionAttrib = 0
+            # tetgen.DetectInter = 1
+            # tetgen.CheckClosure = 1
+            tetgen.Verbose = 1
+            tetgen.MinDihedral = 1.0
+            tetgen.MaxDihedral = 170.0
+            tetgen.Coarsen = 1
+            tetgen.NoBoundarySplit = 0
+            tetgen.MinRatio = 0.1
+            tetgen.MaxVolume = 1E+2
+            tetgen.FixVolume = 0
+
             tetgen.Execute()
 
             # ADDING CELL IDs
@@ -426,10 +437,20 @@ class vmtkMeshGeneratorFsi(pypes.pypeScript):
             self.Mesh = tetrahedralize.GetOutput()
 
         self.RemeshedSurface = remeshedSurface
+    
+    def run_with_timeout(self):
+        timeout_seconds = 60  # Set your desired timeout value in seconds
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(self.Execute)
+            try:
+                result = future.result(timeout=timeout_seconds)
+            except concurrent.futures.TimeoutError:
+                print(f"TetGen execution took longer than {timeout_seconds} seconds. Stopping...")
 
 
 if __name__ == '__main__':
 
     main = pypes.pypeMain()
     main.Arguments = sys.argv
-    main.Execute()
+    main.run_with_timeout()
