@@ -500,8 +500,8 @@ if __name__ == "__main__":
     
     max_retries = 5
     retry_delay = 5  # Time delay in seconds between retries
-    a = read_command_line()
-    filename_model = a['filename_model']
+    command_line_inputs = read_command_line()
+    filename_model = command_line_inputs['filename_model']
     case_name = filename_model.rsplit(path.sep, 1)[-1].rsplit('.')[0]
     dir_path = filename_model.rsplit(path.sep, 1)[0]
     file_to_keep = f"{case_name}.vtp"
